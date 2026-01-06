@@ -1,0 +1,205 @@
+# PostgreSQL
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: simon-postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: lvms-vg1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simon-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simon-postgres
+  template:
+    metadata:
+      labels:
+        app: simon-postgres
+    spec:
+      containers:
+        - name: simon-postgres
+          image: quay.io/fedora/postgresql-16:latest
+          ports:
+            - containerPort: 5432
+         
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 100m
+              memory: 512Mi
+          
+          env:
+            - name: POSTGRESQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: simon-db-password
+                  key: username
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: simon-db-password
+                  key: password
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: simon-db-config
+                  key: db-name
+          volumeMounts:
+            - name: simon-postgres-data
+              mountPath: /var/lib/postgresql
+      volumes:
+        - name: simon-postgres-data
+          persistentVolumeClaim:
+            claimName: simon-postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: simon-postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: simon-postgres
+  ports:
+    - port: 5432
+---
+# Redis
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: simon-redis-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: lvms-vg1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simon-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simon-redis
+  template:
+    metadata:
+      labels:
+        app: simon-redis
+    spec:
+      containers:
+        - name: simon-redis
+          image: quay.io/kurs/redis:latest
+          ports:
+            - containerPort: 6379
+       
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 100m
+              memory: 512Mi
+          
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-password
+                  key: password
+          volumeMounts:
+            - name: simon-redis-data
+              mountPath: /var/lib/redis/data
+      volumes:
+        - name: simon-redis-data
+          persistentVolumeClaim:
+            claimName: simon-redis-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: simon-redis
+spec:
+  type: ClusterIP
+  selector:
+    app: simon-redis
+  ports:
+    - port: 6379
+
+# Golang Backend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simon-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: simon-backend
+  template:
+    metadata:
+      labels:
+        app: simon-backend
+    spec:
+      containers:
+        - name: simon-backend
+          image: ghcr.io/Rafaelnacho1/guestbook:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+         
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 100m
+              memory: 512Mi
+            
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: simon-db-config
+                  key: db-host
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: simon-db-config
+                  key: redis-host
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: simon-db-config
+                  key: redis-port
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-password
+                  key: password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: simon-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: simon-backend
+  ports:
+    - port: 8080
