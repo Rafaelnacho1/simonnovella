@@ -158,7 +158,7 @@ spec:
     spec:
       containers:
         - name: simon-backend
-          image: ghcr.io/Rafaelnacho1/guestbook:latest
+          image: ghcr.io/rafaelnacho1/guestbook:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
