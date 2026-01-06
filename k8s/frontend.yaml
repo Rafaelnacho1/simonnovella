@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: simon-frontend
-          image: ghcr.io/rafaelnacho1/frontend:latest   
+          image: ghcr.io/rafaelnacho1/redis:latest   
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
